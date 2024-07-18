@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { Form } from 'react-hook-form';
@@ -11,6 +11,44 @@ import { CalendarDaysIcon } from "lucide-react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { PopoverTrigger } from "@radix-ui/react-popover";
 import { Calendar } from "@/components/ui/calendar";
+
+const Hotels = () => {
+  const [showHotelSearch, setShowHotelSearch] = useState(true);
+  const [showOfferSearch, setShowOfferSearch] = useState(true);
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      <header className="sticky top-0 z-50">
+        <Header />
+      </header>
+      <main className="flex-grow flex flex-col items-center">
+        <div className="flex-grow flex flex-col items-center">
+          <Button
+            onClick={() => setShowHotelSearch(!showHotelSearch)}
+          >
+            {showHotelSearch
+              ? "/\\ Show hotel search /\\"
+              : "\\/ Show hotel search \\/"
+            }
+          </Button>
+          {showHotelSearch && <HotelSearchSection />}
+        </div>
+        <div className="flex-grow flex flex-col items-center">
+          <Button
+            onClick={() => setShowOfferSearch(!showOfferSearch)}
+          >
+            {showOfferSearch
+              ? "/\\ Show offer search /\\"
+              : "\\/ Show offer search \\/"
+            }
+          </Button>
+          {showOfferSearch && <OfferSearchSection />}
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+};
 
 function SearchIcon(props) {
   return (
@@ -211,7 +249,6 @@ function OfferSearch({ setResults }) {
       );
 
       setResults(response.data);
-      console.log(response.data);
     } catch (error) {
       console.log("Error fetching offerData...", error);
       // TODO: Display property not found error
@@ -385,20 +422,66 @@ function screamingCamelCaseToCapitalized(string: string) {
 }
 
 function OfferResultsDisplay({ results }) {
-  const { hotel, offers } = results.data[0];
+  const { hotel, offers } = results.data[0]; // TODO: mapping with data here for individual hotels
+  const [imageHref, setImageHref] = useState("");
+
+  console.log("here");
+  useEffect(() => {
+    const fetchPhotos = async (signal: AbortSignal) => {
+      try {
+        const hotelPhotoReference = await axios.get(
+          '/test/api/reference/hotels/id?' +
+            new URLSearchParams({
+                hotelIds: hotel["hotelId"],
+            })
+            , { signal }
+          )
+          .then(response => response["data"]["data"][0]["photo_reference"]);
+
+        const results = await axios.get(
+          '/test/api/reference/hotels/photo/' + hotelPhotoReference,
+          { params: { maxWidth: "300", }, responseType: "blob" }
+        ).then((response) => {
+          const imageBlob = response.data;
+          const objectURL = window.URL.createObjectURL(imageBlob);
+
+          setImageHref(objectURL);
+        });
+
+        console.log({ photoReference: hotelPhotoReference });
+      } catch (error) {
+        console.error("Failed fetching of photos:", error);
+      }
+    }
+
+    const controller = new AbortController();
+    fetchPhotos(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [results]);
 
   return (
-    <div className="flex flex-col items-stretch">
+    <div className="flex flex-col items-center">
       {offers.map((offer) => {
         const { room, price } = offer;
         console.log(price.variations.average.base);
 
         return (
           <div
-            className="flex flex-col justify-stretch items-stretch bg-background shadow-xl rounded-md gap-3 text-secondary-foreground p-4 w-full max-w-full"
+            className="flex justify-center items-stretch text-secondary-foreground shadow-xl w-full max-w-screen-lg"
             key={hotel.checkInDate + offer.checkOutDate + price.total}
           >
-            <div className="flex gap-3 justify-stretch items-stretch">
+            <div className="max-w-52">
+              <img
+                src={imageHref}
+                width={300}
+                alt={`Image of ${hotel.name}`}
+                className="object-scale-down rounded-l-md shadow-xl"
+              />
+            </div>
+            <div className="flex-1 flex gap-3 justify-stretch items-center bg-background rounded-r-md p-4">
               <div className="flex-1 flex flex-col gap-3">
                 <div>
                   <h2 className="text-2xl">{hotel.name}</h2>
@@ -444,10 +527,10 @@ function OfferSearchSection() {
 
   return (
     <div className="bg-slate-50 flex flex-col items-center">
-      <div className="p-6">
+      <div className="p-3">
         <OfferSearch setResults={setResults}/>
       </div>
-      <div className="p-6 w-full">
+      <div className="p-3 w-full">
         {results.length === 0
           ? (<p>Go search something...</p>)
           : <OfferResultsDisplay results={results}/>}
@@ -455,43 +538,5 @@ function OfferSearchSection() {
     </div>
   );
 }
-
-const Hotels = () => {
-  const [showHotelSearch, setShowHotelSearch] = useState(true);
-  const [showOfferSearch, setShowOfferSearch] = useState(true);
-
-  return (
-    <div className="flex flex-col min-h-screen">
-      <header className="sticky top-0 z-50">
-        <Header />
-      </header>
-      <main className="flex-grow flex flex-col items-center">
-        <div className="flex-grow flex flex-col items-center">
-          <Button
-            onClick={() => setShowHotelSearch(!showHotelSearch)}
-          >
-            {showHotelSearch
-              ? "/\\ Show hotel search /\\"
-              : "\\/ Show hotel search \\/"
-            }
-          </Button>
-          {showHotelSearch && <HotelSearchSection />}
-        </div>
-        <div className="flex-grow flex flex-col items-center">
-          <Button
-            onClick={() => setShowOfferSearch(!showOfferSearch)}
-          >
-            {showOfferSearch
-              ? "/\\ Show offer search /\\"
-              : "\\/ Show offer search \\/"
-            }
-          </Button>
-          {showOfferSearch && <OfferSearchSection />}
-        </div>
-      </main>
-      <Footer />
-    </div>
-  );
-};
 
 export default Hotels;
