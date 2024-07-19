@@ -13,49 +13,13 @@ import { PopoverTrigger } from "@radix-ui/react-popover";
 import { Calendar } from "@/components/ui/calendar";
 
 const Hotels = () => {
-  const [showHotelSearch, setShowHotelSearch] = useState(true);
-  const [showOfferSearch, setShowOfferSearch] = useState(true);
-  const [showOffersOnCitySearch, setShowOffersOnCitySearch] = useState(true);
-
   return (
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50">
         <Header />
       </header>
       <main className="flex-grow flex flex-col items-center">
-        <div className="flex-grow flex flex-col items-center">
-          <Button
-            onClick={() => setShowHotelSearch(!showHotelSearch)}
-          >
-            {showHotelSearch
-              ? "/\\ Show hotel search /\\"
-              : "\\/ Show hotel search \\/"
-            }
-          </Button>
-          {showHotelSearch && <HotelSearchSection />}
-        </div>
-        <div className="flex-grow flex flex-col items-center">
-          <Button
-            onClick={() => setShowOfferSearch(!showOfferSearch)}
-          >
-            {showOfferSearch
-              ? "/\\ Show offer search /\\"
-              : "\\/ Show offer search \\/"
-            }
-          </Button>
-          {showOfferSearch && <OfferSearchSection />}
-        </div>
-        <div className="flex-grow flex flex-col items-center">
-          <Button
-            onClick={() => setShowOffersOnCitySearch(!showOffersOnCitySearch)}
-          >
-            {showOffersOnCitySearch
-              ? "/\\ Show offers on city search /\\"
-              : "\\/ Show offers on city search \\/"
-            }
-          </Button>
-          {showOffersOnCitySearch && <OffersOnCitySection />}
-        </div>
+        <OffersOnCitySection />
       </main>
       <Footer />
     </div>
@@ -477,7 +441,6 @@ const OfferResult = React.memo(function OfferResult({ offer }) {
 
   const [imageHref, setImageHref] = useState("");
 
-  console.log("here");
   useEffect(() => {
     const fetchPhotos = async (signal: AbortSignal) => {
       try {
@@ -506,6 +469,9 @@ const OfferResult = React.memo(function OfferResult({ offer }) {
 
         console.log({ photoReference: hotelPhotoReference });
       } catch (error) {
+        if (error.name === "AbortError") {
+          return;
+        }
         console.error("Failed fetching of photos:", error);
       }
     }

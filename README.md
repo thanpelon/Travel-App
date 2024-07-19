@@ -1,3 +1,16 @@
+## Developer note:
+
+The only thing valuable here is the `/hotels` route. In there, I showed how to fetch and display the data
+returned by the:
+
+- `api/reference/hotels/search/{keyword, city}` for fetching hotels
+- `api/reference/hotels/offers/search` for fetching hotelOffers using hotelIds
+- `api/reference/hotels/id/:ids` and the `api/reference/hotels/picture/:reference` for fetching the hotel image
+
+Thank you and good luck. o7
+
+----
+
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
