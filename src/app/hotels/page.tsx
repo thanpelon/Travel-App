@@ -15,6 +15,7 @@ import { Calendar } from "@/components/ui/calendar";
 const Hotels = () => {
   const [showHotelSearch, setShowHotelSearch] = useState(true);
   const [showOfferSearch, setShowOfferSearch] = useState(true);
+  const [showOffersOnCitySearch, setShowOffersOnCitySearch] = useState(true);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -43,6 +44,17 @@ const Hotels = () => {
             }
           </Button>
           {showOfferSearch && <OfferSearchSection />}
+        </div>
+        <div className="flex-grow flex flex-col items-center">
+          <Button
+            onClick={() => setShowOffersOnCitySearch(!showOffersOnCitySearch)}
+          >
+            {showOffersOnCitySearch
+              ? "/\\ Show offers on city search /\\"
+              : "\\/ Show offers on city search \\/"
+            }
+          </Button>
+          {showOffersOnCitySearch && <OffersOnCitySection />}
         </div>
       </main>
       <Footer />
@@ -205,7 +217,7 @@ function HotelSearchSection() {
         <HotelSearch resultSetter={setSearchResult}/>
       </div>
 
-      <div className="p-6">
+      <div className="p-6 ">
         {searchResult.length == 0
           ? "Go search something..."
           : <HotelSearchResults rawHotelResults={searchResult}/>
@@ -248,7 +260,7 @@ function OfferSearch({ setResults }) {
           new URLSearchParams(params)
       );
 
-      setResults(response.data);
+      setResults(response.data.data);
     } catch (error) {
       console.log("Error fetching offerData...", error);
       // TODO: Display property not found error
@@ -421,8 +433,48 @@ function screamingCamelCaseToCapitalized(string: string) {
     }).join(" ");
 }
 
-function OfferResultsDisplay({ results }) {
-  const { hotel, offers } = results.data[0]; // TODO: mapping with data here for individual hotels
+const OfferResults = React.memo(function OfferResults({ results }) {
+  console.log("rendered offer results");
+  const hotelOffers = results.flatMap((hotelWithOffer) => {
+    const { hotel, offers } = hotelWithOffer;
+    const { hotelId, name, contact } = hotel;
+
+    return offers.map((offer) => {
+      offer.hotel = { hotelId, name, contact };
+      return offer;
+    });
+  });
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      {hotelOffers.map((hotelOffer) => {
+        return <OfferResult offer={hotelOffer} key={hotelOffer.id} />
+      })}
+    </div>
+  )
+});
+
+// originally from:
+// https://stackoverflow.com/questions/542938/how-to-calculate-number-of-days-between-two-dates/543152#543152
+function datesDaysDiff(first: Date, second: Date) {
+  const millisecondsInADay = 1000 * 60 * 60 * 24;
+  const millisDifference = second.valueOf() - first.valueOf();
+
+  return Math.round(millisDifference / millisecondsInADay);
+}
+
+const OfferResult = React.memo(function OfferResult({ offer }) {
+  const { hotel, room, price } = offer;
+  const { name, hotelId } = hotel;
+
+  const checkInDate = new Date(offer.checkInDate);
+  const checkOutDate = new Date(offer.checkOutDate);
+  const checkInOutRange = dateTimeFormatter.formatRange(checkInDate, checkOutDate);
+
+  const daysOfStay = Math.abs(datesDaysDiff(checkInDate, checkOutDate));
+  const unformattedAverage = price.total / daysOfStay;
+  let averagePrice = unformattedAverage.toFixed(2);
+
   const [imageHref, setImageHref] = useState("");
 
   console.log("here");
@@ -432,15 +484,19 @@ function OfferResultsDisplay({ results }) {
         const hotelPhotoReference = await axios.get(
           '/test/api/reference/hotels/id?' +
             new URLSearchParams({
-                hotelIds: hotel["hotelId"],
+                hotelIds: hotelId,
             })
             , { signal }
           )
           .then(response => response["data"]["data"][0]["photo_reference"]);
 
+        if (!hotelPhotoReference) {
+          throw Error("No references found.");
+        }
+
         const results = await axios.get(
           '/test/api/reference/hotels/photo/' + hotelPhotoReference,
-          { params: { maxWidth: "300", }, responseType: "blob" }
+          { params: { maxWidth: "200", }, responseType: "blob", signal }
         ).then((response) => {
           const imageBlob = response.data;
           const objectURL = window.URL.createObjectURL(imageBlob);
@@ -460,67 +516,59 @@ function OfferResultsDisplay({ results }) {
     return () => {
       controller.abort();
     };
-  }, [results]);
+  }, [offer]);
 
+  console.log(offer);
   return (
-    <div className="flex flex-col items-center">
-      {offers.map((offer) => {
-        const { room, price } = offer;
-        console.log(price.variations.average.base);
-
-        return (
-          <div
-            className="flex justify-center items-stretch text-secondary-foreground shadow-xl w-full max-w-screen-lg"
-            key={hotel.checkInDate + offer.checkOutDate + price.total}
-          >
-            <div className="max-w-52">
-              <img
-                src={imageHref}
-                width={300}
-                alt={`Image of ${hotel.name}`}
-                className="object-scale-down rounded-l-md shadow-xl"
-              />
-            </div>
-            <div className="flex-1 flex gap-3 justify-stretch items-center bg-background rounded-r-md p-4">
-              <div className="flex-1 flex flex-col gap-3">
-                <div>
-                  <h2 className="text-2xl">{hotel.name}</h2>
-                  <p>
-                    {dateTimeFormatter.formatRange(new Date(offer.checkInDate), new Date(offer.checkOutDate))}
-                  </p>
-                </div>
-                <div>
-                  <span>{screamingCamelCaseToCapitalized(room.typeEstimated.category)}</span>
-                  <p>
-                    <span>{room.typeEstimated.beds} </span>
-                    <span className="italic">{room.typeEstimated.bedType}</span>
-                    <span>-sized bed(s)</span>
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="flex flex-col gap-4">
-                  <div className="flex-1">
-                    <h3 className="text-2xl">
-                      <span>{price.currency} </span>
-                      <span>{price.variations.average.base ?? price.variations.changes[0].base}</span>
-                    </h3>
-                    <p className="text-muted-foreground">
-                      <span>Total Price: </span>
-                      <span>{price.currency} </span>
-                      <span>{price.total} </span>
-                    </p>
-                  </div>
-                  <Button className="w-64"> {'>'} Book </Button>
-                </div>
-              </div>
-            </div>
+    <div
+      className="flex justify-center items-stretch min-w-px w-screen lg:max-w-screen-lg md:max-w-screen-md sm:max-w-screen-sm text-secondary-foreground shadow-lg h-36"
+      key={offer.checkInDate + offer.checkOutDate + price.total}
+    >
+      <div className="bg-sky-50 rounded-l-md h-full min-w-[200px]">
+        <img
+          src={imageHref}
+          width={200}
+          alt={`Image of ${hotel.name}`}
+          className="object-cover h-full grid place-content-center rounded-l-md shadow-lg"
+        />
+      </div>
+      <div className="flex-1 flex gap-3 justify-stretch items-center min-w-px bg-background rounded-r-md px-6 py-4">
+        <div className="flex-1 flex flex-col gap-3 min-w-px">
+          <div className="truncate">
+            <h2 className="text-2xl truncate">{hotel.name}</h2>
+            <p>
+              {checkInOutRange}
+            </p>
           </div>
-        );
-      })}
+          <div>
+            <span>{screamingCamelCaseToCapitalized(room.typeEstimated.category)}</span>
+            <p>
+              <span>{room.typeEstimated.beds} </span>
+              <span className="italic">{room.typeEstimated.bedType}</span>
+              <span>-sized bed(s)</span>
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="flex flex-col gap-4">
+            <div className="flex-1">
+              <h3 className="text-2xl">
+                <span>{price.currency} </span>
+                <span>{averagePrice}</span>
+              </h3>
+              <p className="text-muted-foreground">
+                <span>Total Price: </span>
+                <span>{price.currency} </span>
+                <span>{price.total} </span>
+              </p>
+            </div>
+            <Button className="w-64"> {'>'} Book </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
-}
+});
 
 function OfferSearchSection() {
   const [results, setResults] = useState([]);
@@ -530,12 +578,257 @@ function OfferSearchSection() {
       <div className="p-3">
         <OfferSearch setResults={setResults}/>
       </div>
-      <div className="p-3 w-full">
+      <div className="p-3 grid place-content-center">
         {results.length === 0
           ? (<p>Go search something...</p>)
-          : <OfferResultsDisplay results={results}/>}
+          : <OfferResults results={results}/>
+        }
       </div>
     </div>
+  );
+}
+
+function OffersOnCitySection() {
+  const [searchResult, setSearchResult] = useState([]);
+
+  return (
+    <div className="bg-slate-50 flex flex-col items-center">
+      <div className="p-6">
+        <OffersOnCitySearch setResults={setSearchResult}/>
+      </div>
+
+      <div className="p-6 min-w-px grid place-content-center">
+        {searchResult.length == 0
+          ? "Go search something..."
+          : <OfferResults results={searchResult}/>
+        }
+      </div>
+    </div>
+  );
+}
+
+function OffersOnCitySearch({ setResults }) {
+  const priceStep = 10;
+  const maxHotels = 20;
+  const minimumHotelsToFetch = 10;
+
+  const [cityIataCode, setCityIataCode] = useState("");
+  const [adults, setAdults] = useState(1);
+  const [checkInDate, setCheckInDate] = useState("");
+  const [checkOutDate, setCheckOutDate] = useState("");
+  const [minPrice, setMinPrice] = useState(0);
+  const [maxPrice, setMaxPrice] = useState(200);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+
+    if (!checkInDate || !checkOutDate) {
+      return;
+    }
+
+    try {
+      const citySearchParams: Record<string, string> = {
+        cityCode: cityIataCode,
+        radius: "10",
+      };
+
+      const citySearchResponse = await axios.get(
+        "/test/api/reference/hotels/search/city?" +
+          new URLSearchParams(citySearchParams)
+      );
+
+      const hotelsData = citySearchResponse.data.data;
+      let hotelsWithOffers = [];
+
+      while (hotelsData.length > 0 && hotelsWithOffers.length < minimumHotelsToFetch) {
+        try {
+          console.log("Remaining hotels fetched:", hotelsData.length);
+          console.log("Hotels with offers:", hotelsWithOffers.length);
+
+          const hotelIds = hotelsData
+            .splice(0, maxHotels)
+            .map((hotelInfo) => hotelInfo.hotelId)
+            .join(",");
+
+          const offerSearchParams: Record<string, string> = {
+            hotelIds,
+            // amenities: , // TODO
+            adults: adults.toString(),
+            checkInDate: checkInDate.toString(),
+            checkOutDate: checkOutDate.toString(),
+            priceRange: `${minPrice}-${maxPrice}`,
+            currency: "USD",
+          };
+
+          const hotelOffersResponse = await axios.get(
+            "/test/api/reference/hotels/offers/search?" +
+              new URLSearchParams(offerSearchParams)
+          );
+
+          console.log(hotelOffersResponse.data);
+          Array.prototype.push.apply(hotelsWithOffers, hotelOffersResponse.data.data);
+        } catch (error) {
+          if (error.response?.data?.message?.length !== 0) {
+            continue;
+          }
+
+          throw error;
+        }
+      }
+
+      console.log(hotelsWithOffers);
+      setResults(hotelsWithOffers);
+    } catch (error) {
+      console.log("Error fetching offerData...", error);
+      // TODO: Display property not found error
+    }
+  }
+
+  return (
+    <form
+      className='flex flex-col gap-5 w-2xl p-6 bg-background shadow-xl rounded-sm'
+      onSubmit={handleSubmit}
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-center justify-items-center">
+        <div className='flex gap-5 items-center'>
+          <span className="text-center text-xl items-center">
+            City Iata Code:
+          </span>
+          <div className="relative max-w-2xl flex">
+            <Input
+              type="text"
+              className="bg-gray-100 text-black placeholder:text-gray-500 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-gray-500 flex-1"
+              placeholder="City Code"
+              value={cityIataCode}
+              onChange={e => setCityIataCode(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="flex gap-5 items-center">
+          <span className="text-center text-xl">
+            Adults:
+          </span>
+          <Input
+            type="number"
+            className="bg-gray-100 text-black placeholder:text-gray-500 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-gray-500 flex-1"
+            placeholder="Adults"
+            min={1}
+            max={9}
+            step={priceStep}
+            value={adults}
+            onChange={e => setAdults(parseInt(e.target.value))}
+          />
+        </div>
+        <div className="flex items-center gap-4 ">
+          <CalendarDaysIcon className="w-6 h-6 text-muted-foreground" />
+          <div className="flex-1">
+            <label
+              htmlFor="departure-date"
+              className="block text-sm font-medium text-muted-foreground"
+            >
+              Check In
+            </label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  id="departure-date"
+                  variant="outline"
+                  className="w-full mt-1 justify-start text-left font-normal"
+                >
+                  <span>{checkInDate || "Select date"}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="single"
+                  selected={checkInDate ? new Date(checkInDate) : undefined}
+                  onSelect={(date) => {
+                    if (date) {
+                      setCheckInDate(date.toLocaleDateString('en-CA')); // Formats as YYYY-MM-DD
+                    }
+                  }}
+                  disabled={(date) => (date.setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0)) || (
+                    checkOutDate.length !== 0 && (date > new Date(checkOutDate))
+                  )} // Disable dates before today
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="flex-1">
+            <label
+              htmlFor="return-date"
+              className="block text-sm font-medium text-muted-foreground"
+            >
+              Check Out
+            </label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  id="return-date"
+                  variant="outline"
+                  className="w-full mt-1 justify-start text-left font-normal"
+                >
+                  <span>{checkOutDate || "Select date"}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="single"
+                  selected={checkOutDate ? new Date(checkOutDate) : undefined}
+                  onSelect={(date) => {
+                    if (date) {
+                      setCheckOutDate(date.toLocaleDateString('en-CA')); // Formats as YYYY-MM-DD
+                    }
+                  }}
+                  disabled={(date) => (date.setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0)) || (
+                    checkInDate.length !== 0 && (date.setHours(0) < new Date(checkInDate).setHours(0))
+                  )} // Disable dates before today
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+        <div className='flex gap-5 items-center'>
+          <label htmlFor="offer-min-price" className='flex items-center gap-5'>
+            <span className="text-center text-xl items-center">
+              Min:
+            </span>
+            <div className="relative max-w-2xl flex">
+              <Input
+                type="number"
+                className="bg-gray-100 text-black placeholder:text-gray-500 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-gray-500 flex-1"
+                placeholder="Min Price"
+                id="offer-min-price"
+                min={0}
+                max={maxPrice - priceStep}
+                step={priceStep}
+                value={minPrice}
+                onChange={e => setMinPrice(parseInt(e.target.value))}
+              />
+            </div>
+          </label>
+          <label htmlFor="offer-max-price" className='flex items-center gap-5'>
+            <span className="text-center text-xl items-center">
+              Max:
+            </span>
+            <div className="relative max-w-2xl flex">
+              <Input
+                type="number"
+                className="bg-gray-100 text-black placeholder:text-gray-500 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-gray-500 flex-1"
+                placeholder="Max Price"
+                id="offer-max-price"
+                min={minPrice + priceStep}
+                value={maxPrice}
+                onChange={e => setMaxPrice(parseInt(e.target.value))}
+              />
+            </div>
+          </label>
+        </div>
+      </div>
+      <Button>Search Hotel Offers</Button>
+    </form>
   );
 }
 
