@@ -502,16 +502,24 @@ const OfferResult = React.memo(function OfferResult({ offer }) {
         <div className="flex-1 flex flex-col gap-3 min-w-px">
           <div className="truncate">
             <h2 className="text-2xl truncate">{hotel.name}</h2>
-            <p>
-              {checkInOutRange}
-            </p>
+            <p>{checkInOutRange}</p>
           </div>
           <div>
-            <span>{screamingCamelCaseToCapitalized(room.typeEstimated.category)}</span>
+            {room.typeEstimated.category &&
+              (offer.roomQuantity
+                ? <>
+                  <span>{offer.roomQuantity} </span>
+                  <span>{screamingCamelCaseToCapitalized(room.typeEstimated.category)}s</span>
+                </>
+                : <span>{screamingCamelCaseToCapitalized(room.typeEstimated.category)}</span>
+              )
+            }
             <p>
               <span>{room.typeEstimated.beds} </span>
               <span className="italic">{room.typeEstimated.bedType}</span>
-              <span>-sized bed(s)</span>
+              <span>-sized bed</span>
+              {parseInt(room.typeEstimated.beds) > 1 && <span>s</span>}
+              {offer.roomQuantity && <span> each</span>}
             </p>
           </div>
         </div>
@@ -576,10 +584,11 @@ function OffersOnCitySection() {
 function OffersOnCitySearch({ setResults }) {
   const priceStep = 10;
   const maxHotels = 20;
-  const minimumHotelsToFetch = 10;
+  const minimumHotelsToFetch = 3;
 
   const [cityIataCode, setCityIataCode] = useState("");
   const [adults, setAdults] = useState(1);
+  const [rooms, setRooms] = useState(1);
   const [checkInDate, setCheckInDate] = useState("");
   const [checkOutDate, setCheckOutDate] = useState("");
   const [minPrice, setMinPrice] = useState(0);
@@ -620,6 +629,7 @@ function OffersOnCitySearch({ setResults }) {
             hotelIds,
             // amenities: , // TODO
             adults: adults.toString(),
+            roomQuantity: rooms.toString(),
             checkInDate: checkInDate.toString(),
             checkOutDate: checkOutDate.toString(),
             priceRange: `${minPrice}-${maxPrice}`,
@@ -680,9 +690,24 @@ function OffersOnCitySearch({ setResults }) {
             placeholder="Adults"
             min={1}
             max={9}
-            step={priceStep}
+            step={1}
             value={adults}
             onChange={e => setAdults(parseInt(e.target.value))}
+          />
+        </div>
+        <div className="flex gap-5 items-center">
+          <span className="text-center text-xl">
+            Rooms:
+          </span>
+          <Input
+            type="number"
+            className="bg-gray-100 text-black placeholder:text-gray-500 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-gray-500 flex-1"
+            placeholder="Rooms"
+            min={1}
+            max={adults}
+            step={1}
+            value={rooms}
+            onChange={e => setRooms(parseInt(e.target.value))}
           />
         </div>
         <div className="flex items-center gap-4 ">
