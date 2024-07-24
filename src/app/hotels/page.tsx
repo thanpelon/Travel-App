@@ -584,7 +584,10 @@ function OffersOnCitySection() {
 function OffersOnCitySearch({ setResults }) {
   const priceStep = 10;
   const maxHotels = 20;
-  const minimumHotelsToFetch = 3;
+  const minimumHotelsToFetch = 10;
+
+  const controller = new AbortController();
+  const { signal } = controller;
 
   const [cityIataCode, setCityIataCode] = useState("");
   const [adults, setAdults] = useState(1);
@@ -593,6 +596,12 @@ function OffersOnCitySearch({ setResults }) {
   const [checkOutDate, setCheckOutDate] = useState("");
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(200);
+
+  useEffect(() => {
+    return () => {
+      controller.abort();
+    };
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -609,7 +618,8 @@ function OffersOnCitySearch({ setResults }) {
 
       const citySearchResponse = await axios.get(
         "/test/api/reference/hotels/search/city?" +
-          new URLSearchParams(citySearchParams)
+          new URLSearchParams(citySearchParams),
+        { signal }
       );
 
       const hotelsData = citySearchResponse.data.data;
@@ -638,7 +648,8 @@ function OffersOnCitySearch({ setResults }) {
 
           const hotelOffersResponse = await axios.get(
             "/test/api/reference/hotels/offers/search?" +
-              new URLSearchParams(offerSearchParams)
+              new URLSearchParams(offerSearchParams),
+            { signal }
           );
 
           console.log(hotelOffersResponse.data);
@@ -648,6 +659,9 @@ function OffersOnCitySearch({ setResults }) {
             continue;
           }
 
+          if (error.name === "AbortController") {
+            break;
+          }
           throw error;
         }
       }
